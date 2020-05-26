@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>翻译聚合</title>
+    <meta charset="utf-8">
+    <!-- 禁止 Bootstrap 响应式布局 -->
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1">  -->
+    <link rel="stylesheet" type="text/css" href="css/bootoast.css">
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/popper.js/1.15.0/umd/popper.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/bootoast.js"></script>
+    <script>
+        var regs = [];      // 存储格式化策略
+        var rTexts = [];
+
+        function tdclick(tdObj) {
+            let td = $(tdObj);
+            td.attr("onclick", "");
+            let text = td.text();       // 1, 取出当前 td 中的文本内容保存起来
+            td.html("");                // 2, 清空 td 里面的内容
+            let input = $("<input>");   // 3, 建立一个文本框，也就是 input 的元素节点
+            input.attr("value", text);  // 4, 设置文本框的值是保存起来的文本内容
+            input.bind("blur", function () {
+                let inputnode = $(this);
+                let inputtext = inputnode.val();
+                let tdNode = inputnode.parent();
+                tdNode.html(inputtext);
+                tdNode.click(tdclick);
+                td.attr("onclick", "tdclick(this)");
+            });
+            input.keyup(function (event) {
+                let myEvent = event || window.event;
+                let kcode = myEvent.keyCode;
+                if (kcode == 13) {
+                    let inputnode = $(this);
+                    let inputtext = inputnode.val();
+                    let tdNode = inputnode.parent();
+                    tdNode.html(inputtext);
+                    tdNode.click(tdclick);
+                }
+            });
+            td.append(input);           // 5. 将文本框加入到td中
+            let t = input.val();
+            input.val("").focus().val(t);
+            td.unbind("click");         // 6. 清除点击事件
+        }
+
+        function addtr() {
+            let len = $("#fsTable>tr").length;
+            if (len < 10) {
+                let table = $("#fsTable");
+                let tr = $("<tr>" +
+                    "<td onclick='tdclick(this)' style='vertical-align: middle; text-align: center;'>" + "</td>" +
+                    "<td onclick='tdclick(this)' style='vertical-align: middle; text-align: center;'>" + "</td>" +
+                    "<td><button type='button' class='btn-outline-light text-dark btn-link' onclick='deletetr(this)' style='vertical-align: middle; text-align: center;'>" + "删除" + "</button></td>" +
+                    "</tr>");
+                table.append(tr);
+            } else {
+                bootoast({
+                    message: "添加失败，最多配置 10 条！",
+                    type: 'warning',
+                    position: 'top-right',
+                    timeout: 3
+                });
+            }
+        }
+
+        function deletetr(tdObj) {
+            let td = $(tdObj);
+            td.parents("tr").remove();
+        }
+
+        function copyText(pObj) {
+            let selection = window.getSelection();  // 创建Selection 对象
+            let range = document.createRange();     // 创建Range 对象
+            range.selectNodeContents(pObj);         // 设定一个目标节点内容的 Range 
+            selection.removeAllRanges();            // 清空选择区域
+            selection.addRange(range);              // 选中元素, 这一步可以实现全选
+            document.execCommand("copy");           // 复制到粘贴板
+            selection.removeAllRanges();            // 选择完成之后清空选择
+            bootoast({
+                message: "复制成功！",
+                type: 'success',
+                position: 'top-right',
+                timeout: 2
+            });
+        }
+
+        function changeSTLang(obj) {
+            let stLang = $("#stLang");
+            obj = $(obj);
+            stLang.text(obj.text());
+        }
+
+        const googleTranslate = require("./js/google");
+        const youdaoTranslate = require("./js/youdao");
+        const baiduTranslate = require("./js/baidu");
+        const tencentTranslate = require("./js/tencent");
+        const utils = require("./js/utils");
+
+        function createSuccessF(p) {
+            return result => {
+                console.log(result);
+                console.log("success to translate \"", result.sText, "\" by using", result.engine);
+                p.text(result.tText);
+            };
+        }
+        function createFailF(sText, engine) {
+            return reason => {
+                console.log("fail to translate \"", sText, "\" by using", engine, ", reason:", reason);
+                bootoast({
+                    message: engine + " 翻译失败！",
+                    type: 'danger',
+                    position: 'top-right',
+                    timeout: 2,
+                });
+            };
+        }
+
+        function format(sText) {
+            for (let i = 0; i < regs.length; ++i) {
+                let reg = regs[i];
+                let rText = rTexts[i];
+                sText = sText.replace(reg, rText);
+            }
+            return sText;
+        }
+
+        function translate(sText) {
+            // 获取 slStr tlStr
+            const stLang = $("#stLang").text().trim();
+            const slStr = stLang.substring(0, 2);
+            const tlStr = stLang.substring(stLang.length - 2, stLang.length);
+            // 谷歌翻译
+            let p = $("#tGoogleText");
+            let successF = createSuccessF(p);
+            let engine = "google";
+            let failF = createFailF(sText, engine);
+            let sl = utils.getLangSymbol(engine, slStr);
+            let tl = utils.getLangSymbol(engine, tlStr);
+            googleTranslate({ sText, sl, tl, successF, failF });
+            // 有道翻译
+            p = $("#tYoudaoText");
+            successF = createSuccessF(p);
+            engine = "youdao";
+            failF = createFailF(sText, engine);
+            sl = utils.getLangSymbol(engine, slStr);
+            tl = utils.getLangSymbol(engine, tlStr);
+            youdaoTranslate({ sText, sl, tl, successF, failF });
+            // 百度翻译
+            p = $("#tBaiduText");
+            successF = createSuccessF(p);
+            engine = "baidu";
+            failF = createFailF(sText, engine);
+            sl = utils.getLangSymbol(engine, slStr);
+            tl = utils.getLangSymbol(engine, tlStr);
+            if (tl === "auto")
+                tl = "zh";
+            baiduTranslate({ sText, sl, tl, successF, failF });
+            // 腾讯翻译
+            p = $("#tTencentText");
+            successF = createSuccessF(p);
+            engine = "tencent";
+            failF = createFailF(sText, engine);
+            sl = utils.getLangSymbol(engine, slStr);
+            tl = utils.getLangSymbol(engine, tlStr);
+            if (tl === "auto")
+                tl = "zh";
+            tencentTranslate({ sText, sl, tl, successF, failF });
+        }
+
+        function clear() {
+            let p = $("#tGoogleText");
+            p.text("此处显示 Google 翻译的结果！");
+            p = $("#tYoudaoText");
+            p.text("此处显示 youdao 翻译的结果！");
+            p = $("#tBaiduText");
+            p.text("此处显示 Baidu 翻译的结果！");
+            p = $("#tTencentText");
+            p.text("此处显示 Tencent 翻译的结果！");
+        }
+
+        $(document).ready(function () {
+            $("#formatBtn").click(function () {
+                let sText = $("#sText").val().trim();
+                sText = format(sText);
+                $("#fText").val(sText);
+            });
+
+            $("#sTransBtn").click(function () {
+                clear();                                // 清楚上一次的翻译结果
+                let sText = $("#sText").val().trim();   // 获取待翻译的文字
+                sText = format(sText);                  // 格式化
+                $("#fText").val(sText);                 // 显示格式化后的文字
+                if (sText.length > 0) {
+                    translate(sText);                   // 开始翻译
+                }
+            });
+
+            $("#fTransBtn").click(function () {
+                clear();
+                let sText = $("#fText").val().trim();
+                if (sText.length > 0) {
+                    translate(sText);
+                }
+            });
+        });
+
+
+        $(document).ready(function () {
+            $('#fsModal').on('hide.bs.modal',
+                function () {
+                    regs = [];
+                    rTexts = [];
+                    let tr = $("#fsTable>tr");
+                    tr.each((index, element) => {
+                        let tds = $(element).children("td");
+                        const reg = tds.first().text();
+                        const rText = tds.slice(1, 2).text();
+                        try {
+                            let regExp = new RegExp(reg, "g");
+                            regs.push(regExp);
+                            rTexts.push(rText);
+                        } catch (e) {
+                            bootoast({
+                                message: "第 " + (index + 1) + " 个正则表达式存在错误！\n[" + e.name + ", " + e.message + "]",
+                                type: 'danger',
+                                position: 'top-right',
+                                timeout: 4,
+                            });
+                        }
+                    });
+                }
+            );
+        });
+
+    </script>
+
+    <style>
+        th,
+        td {
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        /* 禁止 Bootstrap 响应式布局 */
+        .container,
+        .jumbotron {
+            min-width: 1024px !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="jumbotron text-center" style="margin-bottom:0">
+        <h1 class="font-weight-light">翻 译 聚 合</h1>
+        <p class="text-lowercase">Translation Aggregation</p>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-5">
+                <div class="form-group m-3">
+                    <label for="comment">
+                        <h6>请输入要翻译的文字：</h6>
+                    </label>
+                    <textarea class="form-control" rows="10" id="sText" style="resize:none"
+                        placeholder="请在此输入要翻译的文字"></textarea>
+                </div>
+
+                <div class="m-3">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle" style="width: 40%;"
+                        data-toggle="dropdown" id="stLang">
+                        自动监测语言
+                    </button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" onclick="changeSTLang(this)">自动监测语言</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">中文&nbsp; » &nbsp;英语</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">中文&nbsp; » &nbsp;日语</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">中文&nbsp; » &nbsp;韩语</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">英语&nbsp; » &nbsp;中文</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">日语&nbsp; » &nbsp;中文</a>
+                        <a class="dropdown-item" onclick="changeSTLang(this)">韩语&nbsp; » &nbsp;中文</a>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" style="width: 25%;margin-left: 5%;"
+                        id="formatBtn">格式化</button>
+                    <button type="button" class="btn btn-outline-primary" style="width: 25%;float: right;"
+                        id="sTransBtn">一键翻译</button>
+                </div>
+
+                <div class="form-group m-3">
+                    <label for="comment">
+                        <h6>格式化后的文字：</h6>
+                    </label>
+                    <textarea class="form-control" rows="10" id="fText" style="resize:none"></textarea>
+                </div>
+
+                <div class="m-3">
+                    <button type="button" class="btn btn-outline-primary btn-block" id="fTransBtn">翻译格式化后的文字</button>
+                    <!-- 按钮：用于打开模态框 -->
+                    <button type="button" class="btn btn-outline-primary btn-block" data-toggle="modal"
+                        data-target="#fsModal">编辑格式化策略</button>
+                </div>
+
+                <!-- 模态框 -->
+                <div class="modal fade" id="fsModal">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h4 class="modal-title">编辑格式化策略</h4>
+                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <table class="table table-hover table-bordered" id="fsTable">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th width="200">正则表达式</th>
+                                            <th width="200">替换文本</th>
+                                            <th width="100">操作</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                                <div style="margin-top:-15px; width: 15%; float: right;">
+                                    <button type="button" class="btn btn-xs btn-link" onclick="addtr()">添加</button>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <!-- <button type="button" class="btn btn-outline-dark" data-dismiss="modal">保存</button> -->
+                                <button type="button" class="btn btn-outline-dark" data-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="col-7">
+                <div class="card bg-primary text-white m-3">
+                    <div class="card-body">
+                        <h4 class="card-title">Google</h4>
+                        <p class="card-text pre-scrollable" style="height: 6em;" ondblclick="copyText(this)"
+                            id="tGoogleText">
+                            此处显示 Google 翻译的结果！
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card bg-success text-white m-3">
+                    <div class="card-body">
+                        <h4 class="card-title">Baidu</h4>
+                        <p class="card-text pre-scrollable" style="height: 6em;" ondblclick="copyText(this)"
+                            id="tBaiduText">
+                            此处显示 Baidu 翻译的结果！
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card bg-info text-white m-3">
+                    <div class="card-body">
+                        <h4 class="card-title">Tencent</h4>
+                        <p class="card-text pre-scrollable" style="height: 6em;" ondblclick="copyText(this)"
+                            id="tTencentText">
+                            此处显示 Tencent 翻译的结果！
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card bg-danger text-white m-3">
+                    <div class="card-body">
+                        <h4 class="card-title">youdao</h4>
+                        <p class="card-text pre-scrollable" style="height: 6em;" ondblclick="copyText(this)"
+                            id="tYoudaoText">
+                            此处显示 youdao 翻译的结果！
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+</body>
+
+</html>

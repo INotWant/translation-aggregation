@@ -1,0 +1,13 @@
+{
+    "googleHost": "translate.google.cn",
+
+    "youdaoAppid": "申请的有道翻译 Appid",
+    "youdaoKey": "申请的有道翻译 Key",
+
+    "baiduAppid": "申请的百度翻译 Appid",
+    "baiduKey": "申请的百度翻译 Key",
+
+    "tencentSecretId": "申请的腾讯翻译 SecretId",
+    "tencentSecretKey": "申请的腾讯翻译 SecretKey",
+    "tencentRegion": "ap-beijing"
+}

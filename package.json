@@ -1,0 +1,15 @@
+{
+  "name": "translation-aggregation",
+  "version": "1.0.0",
+  "author": "iwant (https://github.com/INotWant)",
+  "license": "MIT",
+  "devDependencies": {
+    "nw": "^0.46.0",
+    "nw-builder": "^3.5.7",
+    "tencentcloud-sdk-nodejs": "^3.0.174"
+  },
+  "scripts": {
+    "dev": "nw src/",
+    "prod": "nwbuild --platforms win32,win64,osx64,linux32,linux64 --buildDir dist/ src/"
+  }
+}
